@@ -110,3 +110,8 @@ def graph_surface(fun, rect, offset=0):
     delta = np.abs(dec - offset).max()  # delta blabla...
     plt.contour(x, y, dec.reshape(x.shape), levels=[offset])  # reshapeam ko ti jelte
     plt.pcolormesh(x, y, dec.reshape(x.shape), vmin=offset - delta, vmax=offset + delta)
+
+def labels_to_one_hot(Y,C):
+    Yoh_ = np.zeros((Y.shape[0],C))
+    Yoh_[range(Y.shape[0]),Y] = 1
+    return Yoh_
