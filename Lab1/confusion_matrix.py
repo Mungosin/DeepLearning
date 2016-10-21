@@ -8,7 +8,7 @@ def get_confusion_matrix(predicted_labels, y_test, possible_labels, print_matrix
         dict[label] = [0]*len(possible_labels)
     
     if not format_length:
-        format_length = int(max(map(len,map(str, possible_labels))))+2
+        format_length = int(max(map(len,map(str, possible_labels))))+5
         
     for i, label in enumerate(y_test):
         predicted = predicted_labels[i]
@@ -84,4 +84,6 @@ def eval_perf_multi(conf_matrix):
             recall_sum += conf_matrix[i][j]
         precision.append(element/precision_sum)
         recall.append(element/recall_sum)
-    return precision, recall
+
+    accuracy = (1.0 * np.sum(np.diag(conf_matrix))) / np.sum(conf_matrix)
+    return accuracy, precision, recall

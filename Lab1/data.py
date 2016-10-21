@@ -64,9 +64,34 @@ def sample_gmm_2d(K, C, N):
     return X, Y.flatten()
 
 
-def graph_data(X, Y_, Y):
-    correctly_classified = X[np.where(Y == Y_)]
-    incorrectly_classified = X[np.where(Y != Y_)]
+# def graph_data(X, Y_, Y):
+#     correctly_classified = X[np.where(Y == Y_)]
+#     incorrectly_classified = X[np.where(Y != Y_)]
+#
+#     colors = np.array([0.3] * len(X))
+#     colors[np.where(Y_ == 1)] = 1
+#
+#     color_correct = colors[np.where(Y == Y_)]
+#     color_incorrect = colors[np.where(Y != Y_)]
+#
+#     plt.scatter(correctly_classified[:, 0], correctly_classified[:, 1],
+#                 color=zip(color_correct, color_correct, color_correct), marker='o', edgecolors=(0, 0, 0))
+#     plt.scatter(incorrectly_classified[:, 0], incorrectly_classified[:, 1],
+#                 color=zip(color_incorrect, color_incorrect, color_incorrect), marker='s', edgecolors=(0, 0, 0))
+
+
+def graph_data(X, Y_, Y, special=[]):
+    correct = np.where(Y == Y_)
+    incorrect = np.where(Y != Y_)
+    correctly_classified = X[correct]
+    incorrectly_classified = X[incorrect]
+
+    sizes = np.array([50] * len(X))
+    if len(special) != 0:
+        sizes[special] *= 3
+
+    correct_sizes = sizes[correct]
+    incorrect_sizes = sizes[incorrect]
 
     colors = np.array([0.3] * len(X))
     colors[np.where(Y_ == 1)] = 1
@@ -75,9 +100,11 @@ def graph_data(X, Y_, Y):
     color_incorrect = colors[np.where(Y != Y_)]
 
     plt.scatter(correctly_classified[:, 0], correctly_classified[:, 1],
-                color=zip(color_correct, color_correct, color_correct), marker='o', edgecolors=(0, 0, 0))
+                color=zip(color_correct, color_correct, color_correct), marker='o', edgecolors=(0, 0, 0),
+                s=correct_sizes)
     plt.scatter(incorrectly_classified[:, 0], incorrectly_classified[:, 1],
-                color=zip(color_incorrect, color_incorrect, color_incorrect), marker='s', edgecolors=(0, 0, 0))
+                color=zip(color_incorrect, color_incorrect, color_incorrect), marker='s', edgecolors=(0, 0, 0),
+                s=incorrect_sizes)
 
 
 # def graph_surface(fun, rect, offset=0):
