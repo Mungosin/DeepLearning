@@ -7,7 +7,6 @@ class TFLogreg:
            - D: dimensions of each datapoint
            - param_delta: training step
         """
-
         self.sess = tf.Session()
 
         # definicija podataka i parametara:
@@ -18,7 +17,7 @@ class TFLogreg:
         self.W = tf.Variable(tf.random_normal([D, C], stddev=std))
         self.b1 = tf.Variable(tf.random_normal([C], stddev=std))
 
-        # formulacija modela: izračunati self.probs
+        # formulacija modela: izracunati self.probs
         #   koristiti: tf.matmul, tf.nn.softmax
         # ...
         self.model_score = tf.matmul(self.X, self.W) + self.b1
@@ -33,7 +32,7 @@ class TFLogreg:
         self.loss = (tf.reduce_mean(-tf.reduce_sum(tf.log(self.Y) * self.Yoh_, reduction_indices=1)
                                     + param_lambda * tf.nn.l2_loss(self.W)))
 
-        # formulacija operacije učenja: self.train_step
+        # formulacija operacije ucenja: self.train_step
         #   koristiti: tf.train.GradientDescentOptimizer,
         #              tf.train.GradientDescentOptimizer.minimize
         # ...
@@ -45,7 +44,7 @@ class TFLogreg:
 
         pass
 
-    def train(self, X, Yoh_, param_niter):
+    def train(self, X, Yoh_, param_niter,print_every=1000):
         """Arguments:
            - X: actual datapoints [NxD]
            - Yoh_: one-hot encoded labels [NxC]
@@ -57,6 +56,8 @@ class TFLogreg:
         self.sess.run(tf.initialize_all_variables())
         for i in range(param_niter):
             _, loss = self.sess.run([self.optimizer, self.loss], feed_dict={self.X: X, self.Yoh_: Yoh_})
+            if i % print_every==0:
+                print "Iteration - %d, Loss - %f" %(i, loss)
         # optimizacijska petlja
         #   koristiti: tf.Session.run
         # ...

@@ -1,22 +1,27 @@
 import tensorflow as tf
-
+from sklearn.cross_validation import train_test_split
+import math
+import random
 
 class TFDeep:
     def __init__(self, layer, param_delta=0.01, param_lambda=1e-4, activation=tf.nn.relu,
-                 std=1.0, optimizer=tf.train.GradientDescentOptimizer):
+                 std=1.0, optimizer=tf.train.GradientDescentOptimizer, checkpoint_file="model.ckpt"):
         """Arguments:
            - D: dimensions of each datapoint
            - C: number of classes
            - param_delta: training step
         """
-
+        self.reset()
+        self.checkpoint_file = checkpoint_file
         self.sess = tf.Session()
+        self.weights = []
+        self.biases = []
 
         # definicija podataka i parametara:
         # definirati self.X, self.Yoh_, self.W, self.b
         # ...
-        self.X = tf.placeholder(tf.float32, [None, layer[0]])
-        self.Yoh_ = tf.placeholder(tf.float32, [None, layer[-1]])
+        self.X = tf.placeholder(tf.float32, [None, layer[0]], name="input")
+        self.Yoh_ = tf.placeholder(tf.float32, [None, layer[-1]], name="output")
         prev = layer[0]
         out = self.X
 
@@ -31,10 +36,16 @@ class TFDeep:
                 l2_reg = tf.nn.l2_loss(temp_W) + tf.nn.l2_loss(temp_b)
             else:
                 l2_reg += tf.nn.l2_loss(temp_W) + tf.nn.l2_loss(temp_b)
+            self.weights.append(temp_W)
+            self.biases.append(temp_b)
 
-        temp_W = tf.Variable(tf.random_normal([prev, layer[-1]], stddev=std))
-        temp_b = tf.Variable(tf.random_normal([layer[-1]], stddev=std))
+        temp_W = tf.Variable(tf.random_normal([prev, layer[-1]], stddev=std), name="last_layer_w")
+        temp_b = tf.Variable(tf.random_normal([layer[-1]], stddev=std), name="last_layer_b")
+        self.weights.append(temp_W)
+        self.biases.append(temp_b)
+
         self.last_layer_w = temp_W
+
         out = tf.nn.softmax(tf.matmul(out, temp_W) + temp_b)
         if l2_reg != None:
             l2_reg += tf.nn.l2_loss(temp_W) + tf.nn.l2_loss(temp_b)
@@ -51,7 +62,7 @@ class TFDeep:
         self.loss = (tf.reduce_mean(-tf.reduce_sum(tf.log(self.Y) * self.Yoh_, reduction_indices=1)
                                     + param_lambda * l2_reg))
 
-        # formulacija operacije učenja: self.train_step
+        # formulacija operacije ucenja: self.train_step
         #   koristiti: tf.train.GradientDescentOptimizer,
         #              tf.train.GradientDescentOptimizer.minimize
         # ...
@@ -63,24 +74,68 @@ class TFDeep:
 
         pass
 
-    def train(self, X, Yoh_, param_niter, print_every=1000):
+    def train(self, X, Yoh_, param_niter, print_every=1000, early_stop_after=50, minibatch=False):
         """Arguments:
            - X: actual datapoints [NxD]
            - Yoh_: one-hot encoded labels [NxC]
            - param_niter: number of iterations
+           - early_stop_after: if False it will not early stop if it is a number the number will define patience
+           - minibatch: if False it will not train in minibatches, otherwise the number will define number of batches
         """
         # incijalizacija parametara
         #   koristiti: tf.initialize_all_variables
         # ...
+        X_train, X_validate, y_train, y_validate = train_test_split(X, Yoh_, test_size=0.2, stratify=Yoh_)
         self.sess.run(tf.initialize_all_variables())
+        val_best = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate})
+        cnt = 0
+        num_layers = len(self.weights)
+        temp_weights = [0] * num_layers
+        temp_biases = [0] * num_layers
+
         for i in range(param_niter):
-            _, loss = self.sess.run([self.optimizer, self.loss], feed_dict={self.X: X, self.Yoh_: Yoh_})
+
+            if minibatch != False:
+                self.train_mb(X_train, y_train, minibatch)
+            else:
+                _ = self.sess.run([self.optimizer], feed_dict={self.X: X_train, self.Yoh_: y_train})
+
+            loss = self.sess.run([self.loss], feed_dict={self.X: X_train, self.Yoh_: y_train})
             if i % print_every == 0:
-                print "Iteration = %d, Loss = %f" % (i, loss)
-        # optimizacijska petlja
-        #   koristiti: tf.Session.run
-        # ...
-        pass
+                print "Iteration = %d, Loss = %s" % (i, loss)
+            if early_stop_after != False:
+                val_loss = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate})
+                if val_best < val_loss:
+                    if cnt >= early_stop_after:
+                        print "Early stopping on iteration = %d, training model restored from checkpoint with training loss = %s, validation loss = %s" % (
+                        i, loss, val_loss)
+                        # self.restore()
+                        for i in range(num_layers):
+                            self.weights[i].assign(temp_weights[i])
+                            self.biases[i].assign(temp_biases[i])
+                        print "Restored model validation set loss = %s" % (
+                        self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate}))
+                        return
+                    cnt += 1
+                else:
+                    cnt = 0
+                    # self.save()
+                    for i in range(num_layers):
+                        temp_weights[i] = self.sess.run(self.weights[i])
+                        temp_biases[i] = self.sess.run(self.biases[i])
+                    val_best = val_loss
+
+    def train_mb(self, X, Yoh_, num_batches):
+        batch_size = int(math.ceil(len(X) / num_batches))
+        data = zip(X, Yoh_)
+        random.shuffle(data)
+        for X_minibatch, y_minibatch in self.next_batch(data, batch_size):
+            _ = self.sess.run([self.optimizer], feed_dict={self.X: X_minibatch, self.Yoh_: y_minibatch})
+
+    def next_batch(self, data, batch_size):
+        """Yield successive n-sized chunks from l."""
+        for i in xrange(0, len(data), batch_size):
+            yield zip(*data[i:i + batch_size])
 
     def eval(self, X):
         """Arguments:
@@ -93,6 +148,17 @@ class TFDeep:
 
     def get_last_layer_weights(self):
         return self.sess.run([self.last_layer_w])
+
+    def save(self):
+        self.saver = tf.train.Saver()
+        self.saver.save(self.sess, self.checkpoint_file)
+
+    def restore(self):
+        self.saver = tf.train.Saver()
+        self.saver.restore(self.sess, self.checkpoint_file)
+
+    def reset(self):
+        tf.reset_default_graph()
 
     def __del__(self):
         self.sess.close()

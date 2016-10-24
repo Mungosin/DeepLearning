@@ -4,9 +4,9 @@ from sklearn import svm
 class KSVMWrap:
     def __init__(self, X, Y_, c=1, g='auto'):
         """Arguments:
-            X,Y_: podatci i točni indeksi razreda
-            c:    relativni značaj podatkovne cijene
-            g:    širina RBF jezgre
+            X,Y_: podatci i tocni indeksi razreda
+            c:    relativni znacaj podatkovne cijene
+            g:    sirina RBF jezgre
         """
         self.clf = svm.SVC(C=c, gamma=g, probability=True)
         self.clf.fit(X, Y_)
