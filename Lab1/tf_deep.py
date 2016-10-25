@@ -5,7 +5,8 @@ import random
 
 class TFDeep:
     def __init__(self, layer, param_delta=0.01, param_lambda=1e-4, activation=tf.nn.relu,
-                 std=1.0, optimizer=tf.train.GradientDescentOptimizer, checkpoint_file="model.ckpt"):
+                 std=1.0, optimizer=tf.train.GradientDescentOptimizer, batch_norm = False,
+                 batch_decay = 0.999, checkpoint_file="model.ckpt"):
         """Arguments:
            - D: dimensions of each datapoint
            - C: number of classes
@@ -22,6 +23,7 @@ class TFDeep:
         # ...
         self.X = tf.placeholder(tf.float32, [None, layer[0]], name="input")
         self.Yoh_ = tf.placeholder(tf.float32, [None, layer[-1]], name="output")
+        self.phase_train = tf.placeholder(tf.bool, name='phase_train')
         prev = layer[0]
         out = self.X
 
@@ -30,7 +32,10 @@ class TFDeep:
         for dim in layer[1:-1]:
             temp_W = tf.Variable(tf.random_normal([prev, dim], stddev=std))
             temp_b = tf.Variable(tf.random_normal([dim], stddev=std))
-            out = activation(tf.matmul(out, temp_W) + temp_b)
+            out = tf.matmul(out, temp_W) + temp_b
+            if batch_norm:
+                out = self.batch_norm_wrapper(out,self.phase_train, decay=batch_decay)
+            out = activation(out)
             prev = dim
             if l2_reg == None:
                 l2_reg = tf.nn.l2_loss(temp_W) + tf.nn.l2_loss(temp_b)
@@ -87,7 +92,7 @@ class TFDeep:
         # ...
         X_train, X_validate, y_train, y_validate = train_test_split(X, Yoh_, test_size=0.2, stratify=Yoh_)
         self.sess.run(tf.initialize_all_variables())
-        val_best = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate})
+        val_best = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate, self.phase_train:False})
         cnt = 0
         num_layers = len(self.weights)
         temp_weights = [0] * num_layers
@@ -98,13 +103,13 @@ class TFDeep:
             if minibatch != False:
                 self.train_mb(X_train, y_train, minibatch)
             else:
-                _ = self.sess.run([self.optimizer], feed_dict={self.X: X_train, self.Yoh_: y_train})
+                _ = self.sess.run([self.optimizer], feed_dict={self.X: X_train, self.Yoh_: y_train, self.phase_train:True})
 
-            loss = self.sess.run([self.loss], feed_dict={self.X: X_train, self.Yoh_: y_train})
+            loss = self.sess.run([self.loss], feed_dict={self.X: X_train, self.Yoh_: y_train, self.phase_train:False})
             if i % print_every == 0:
                 print "Iteration = %d, Loss = %s" % (i, loss)
             if early_stop_after != False:
-                val_loss = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate})
+                val_loss = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate, self.phase_train:False})
                 if val_best < val_loss:
                     if cnt >= early_stop_after:
                         print "Early stopping on iteration = %d, training model restored from checkpoint with training loss = %s, validation loss = %s" % (
@@ -114,7 +119,7 @@ class TFDeep:
                             self.weights[i].assign(temp_weights[i])
                             self.biases[i].assign(temp_biases[i])
                         print "Restored model validation set loss = %s" % (
-                        self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate}))
+                        self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate, self.phase_train:False}))
                         return
                     cnt += 1
                 else:
@@ -130,7 +135,7 @@ class TFDeep:
         data = zip(X, Yoh_)
         random.shuffle(data)
         for X_minibatch, y_minibatch in self.next_batch(data, batch_size):
-            _ = self.sess.run([self.optimizer], feed_dict={self.X: X_minibatch, self.Yoh_: y_minibatch})
+            _ = self.sess.run([self.optimizer], feed_dict={self.X: X_minibatch, self.Yoh_: y_minibatch, self.phase_train:True})
 
     def next_batch(self, data, batch_size):
         """Yield successive n-sized chunks from l."""
@@ -143,9 +148,34 @@ class TFDeep:
            Returns: predicted class probabilites [NxC]
         """
         #   koristiti: tf.Session.run
-        return self.sess.run(self.Y, feed_dict={self.X: X})
+        return self.sess.run(self.Y, feed_dict={self.X: X, self.phase_train:False})
         pass
 
+    def batch_norm_wrapper(self, inputs, is_training, decay = 0.999):
+
+        scale = tf.Variable(tf.ones([inputs.get_shape()[-1]]))
+        beta = tf.Variable(tf.zeros([inputs.get_shape()[-1]]))
+        pop_mean = tf.Variable(tf.zeros([inputs.get_shape()[-1]]), trainable=False)
+        pop_var = tf.Variable(tf.ones([inputs.get_shape()[-1]]), trainable=False)
+        
+        
+        
+        def f_train():
+            batch_mean, batch_var = tf.nn.moments(inputs,[0])
+            train_mean = tf.assign(pop_mean,
+                                   pop_mean * decay + batch_mean * (1 - decay))
+            train_var = tf.assign(pop_var,
+                                  pop_var * decay + batch_var * (1 - decay))
+            with tf.control_dependencies([train_mean, train_var]):
+                return tf.nn.batch_normalization(inputs,
+                    batch_mean, batch_var, beta, scale, 1e-3)
+        def f_test():
+            return tf.nn.batch_normalization(inputs,
+                pop_mean, pop_var, beta, scale, 1e-3)
+        
+        normed = tf.cond(self.phase_train,f_train, f_test)
+        return normed
+    
     def get_last_layer_weights(self):
         return self.sess.run([self.last_layer_w])
 
