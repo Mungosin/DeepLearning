@@ -79,7 +79,7 @@ class TFDeep:
 
         pass
 
-    def train(self, X, Yoh_, param_niter, print_every=1000, early_stop_after=50, minibatch=False):
+    def train(self, X, Yoh_, param_niter, verbose=True, print_every=1000, early_stop_after=50, minibatch=False):
         """Arguments:
            - X: actual datapoints [NxD]
            - Yoh_: one-hot encoded labels [NxC]
@@ -106,19 +106,21 @@ class TFDeep:
                 _ = self.sess.run([self.optimizer], feed_dict={self.X: X_train, self.Yoh_: y_train, self.phase_train:True})
 
             loss = self.sess.run([self.loss], feed_dict={self.X: X_train, self.Yoh_: y_train, self.phase_train:False})
-            if i % print_every == 0:
+            if verbose == True and i % print_every == 0:
                 print "Iteration = %d, Loss = %s" % (i, loss)
             if early_stop_after != False:
                 val_loss = self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate, self.phase_train:False})
                 if val_best < val_loss:
                     if cnt >= early_stop_after:
-                        print "Early stopping on iteration = %d, training model restored from checkpoint with training loss = %s, validation loss = %s" % (
+                        if verbose == True:
+                        	print "Early stopping on iteration = %d, training model restored from checkpoint with training loss = %s, validation loss = %s" % (
                         i, loss, val_loss)
                         # self.restore()
                         for i in range(num_layers):
                             self.weights[i].assign(temp_weights[i])
                             self.biases[i].assign(temp_biases[i])
-                        print "Restored model validation set loss = %s" % (
+                        if verbose == True:
+                        	print "Restored model validation set loss = %s" % (
                         self.sess.run([self.loss], feed_dict={self.X: X_validate, self.Yoh_: y_validate, self.phase_train:False}))
                         return
                     cnt += 1
