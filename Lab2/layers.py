@@ -12,24 +12,40 @@ def variance_scaling_initializer(shape, fan_in, factor=2.0, seed=None):
   #x = stats.truncnorm(-max_val*sigma, max_val*sigma, loc=0, scale=sigma)
   return stats.truncnorm(-2, 2, loc=0, scale=sigma).rvs(shape)
 
+
 # -- ABSTRACT CLASS DEFINITION --
 class Layer(object):
   "Interface for layers"
-
   # See documentation of abstract base classes (ABC): https://docs.python.org/3/library/abc.html
-  # Not clear if we can derive from abc.ABC or it has to be metaclass = ABCMeta
-
   __metaclass__ = ABCMeta
-
   @abstractmethod
   def forward(self, inputs):
+    """
+    Args:
+      inputs: ndarray tensor.
+    Returns:
+      ndarray tensor, result of the forward pass.
+    """
     pass
 
   @abstractmethod
   def backward_inputs(self, grads):
+    """
+    Args:
+      grads: gradient of the loss with respect to the output of the layer.
+    Returns:
+      Gradient of the loss with respect to the input of the layer.
+    """
     pass
 
   def backward_params(self, grads):
+    """
+    Args:
+      grads: gradient of the loss with respect to the output of the layer.
+    Returns:
+      Gradient of the loss with respect to all the parameters of the layer as a list
+      [[w0, g0], ..., [wk, gk], self.name] where w are parameter weights and g their gradient.
+    """
     pass
 
 
@@ -41,7 +57,6 @@ class Convolution(Layer):
   def __init__(self, input_layer, num_filters, kernel_size, name, padding='SAME',
                weights_initializer_fn=variance_scaling_initializer,
                bias_initializer_fn=zero_init):
-    # TODO  change this to [height, width, num_filters]
     # shape of the output is [num_filters, height, width]
 
     self.input_shape = input_layer.shape
@@ -134,8 +149,8 @@ class MaxPooling(Layer):
     dout_newaxis = grad_out[:, :, :, np.newaxis, :, np.newaxis]
     dout_broadcast, _ = np.broadcast_arrays(dout_newaxis, grad_x)
     grad_x[mask] = dout_broadcast[mask]
-    print(np.sum(mask, axis=(3, 5), keepdims=True))
-    print(np.sum(mask, axis=(3, 5), keepdims=True).shape)
+    # print(np.sum(mask, axis=(3, 5), keepdims=True))
+    # print(np.sum(mask, axis=(3, 5), keepdims=True).shape)
     grad_x /= np.sum(mask, axis=(3, 5), keepdims=True)
     grad_x = grad_x.reshape(self.input_shape)
     return grad_x
@@ -166,6 +181,10 @@ class FC(Layer):
   def __init__(self, input_layer, num_outputs, name,
                weights_initializer_fn=variance_scaling_initializer,
                bias_initializer_fn=zero_init):
+    """
+    Args:
+      input_layer
+    """
 
     self.input_shape = input_layer.shape
     self.N = self.input_shape[0]
@@ -182,17 +201,38 @@ class FC(Layer):
     self.has_params = True
 
   def forward(self, inputs):
-    # TODO
-    pass
+    """
+    Args:
+      inputs: ndarray of shape (N, num_inputs)
+    Returns:
+      An ndarray of shape (N, num_outputs)
+    """
+    res = np.dot(inputs,self.weights.transpose()) + self.bias
+    self.cache = inputs
+    return res
 
   def backward_inputs(self, grads):
-    # TODO
-    pass
+    """
+    Args:
+      grads: ndarray of shape (N, num_outputs)
+    Returns:
+      An ndarray of shape (N, num_inputs)
+    """
+    x = self.cache
+    grads = grads.dot(self.weights).reshape(x.shape)
+    return grads
 
   def backward_params(self, grads):
+    """
+    Args:
+      grads: ndarray of shape (N, num_outputs)
+    Returns:
+      List of params and gradient pairs.
+    """
     # TODO
-    #grad_weights = ...
-    #grad_bias = ...
+    x = self.cache
+    grad_weights = np.dot(grads.transpose(),x)
+    grad_bias = np.sum(grads, axis=0)
     return [[self.weights, grad_weights], [self.bias, grad_bias], self.name]
 
 
@@ -204,12 +244,28 @@ class ReLU(Layer):
     self.has_params = False
 
   def forward(self, inputs):
-    # TODO
+    """
+    Args:
+      inputs: ndarray of shape (N, C, H, W).
+    Returns:
+      ndarray of shape (N, C, H, W).
+    """
+    out = inputs * (inputs > 0)
+
+    self.cache = inputs
+    return out
     pass
 
   def backward_inputs(self, grads):
-    # TODO
-    pass
+    """
+    Args:
+      grads: ndarray of shape (N, C, H, W).
+    Returns:
+      ndarray of shape (N, C, H, W).
+    """
+    x = self.cache
+    dx = grads * (x >= 0)
+    return dx
 
 
 class SoftmaxCrossEntropyWithLogits():
@@ -217,33 +273,69 @@ class SoftmaxCrossEntropyWithLogits():
     self.has_params = False
 
   def forward(self, x, y):
+    """
+    Args:
+      x: ndarray of shape (N, num_classes).
+      y: ndarray of shape (N, num_classes).
+    Returns:
+      Scalar, average loss over N examples.
+      It is better to compute average loss here instead of just sum
+      because then learning rate and weight decay won't depend on batch size.
+
+    """
     scores_exp = np.exp(x)
     sum_exp = np.sum(np.exp(x), axis=1)
     probabilities = scores_exp / sum_exp[:, None]
     val = -np.log(probabilities) * y
-
-    self.dscores = probabilities
-    self.dscores[range(len(y)),np.argmax(y,axis=1)] -= 1
+    val = np.sum(val, axis=1)/len(y)
     return val
 
-  def backward_inputs(self):
-    return self.dscores
-    # TODO
-    pass
+  def backward_inputs(self, x, y):
+    """
+    Args:
+      x: ndarray of shape (N, num_classes).
+      y: ndarray of shape (N, num_classes).
+    Returns:
+      Gradient with respect to the x, ndarray of shape (N, num_classes).
+    """
+    # Hint: don't forget that we took the average in the forward pass
+    scores_exp = np.exp(x)
+    sum_exp = np.sum(np.exp(x), axis=1)
+    probabilities = scores_exp / sum_exp[:, None]
+    dscores = probabilities
+    dscores[range(len(y)), np.argmax(y, axis=1)] -= 1
+    dscores /= len(y)
+    return dscores
 
 
 class L2Regularizer():
   def __init__(self, weights, weight_decay, name):
+    """
+    Args:
+      weights: parameters which will be regularizerized
+      weight_decay: lambda, regularization strength
+      name: layer name
+    """
+    # this is still a reference to original tensor so don't change self.weights
     self.weights = weights
     self.weight_decay = weight_decay
     self.name = name
 
   def forward(self):
+    """
+     Returns:
+      Scalar, loss due to the L2 regularization.
+    """
     # TODO
     pass
 
   def backward_params(self):
+    """
+    Returns:
+      Gradient of the L2 loss with respect to the regularized weights.
+    """
     # TODO
+    grad_weights = 0
     return [[self.weights, grad_weights], self.name]
 
 
@@ -260,8 +352,8 @@ class RegularizedLoss():
       loss_val += loss.forward()
     return loss_val
 
-  def backward_inputs(self):
-    return self.data_loss.backward_inputs()
+  def backward_inputs(self, x, y):
+    return self.data_loss.backward_inputs(x, y)
 
   def backward_params(self):
     grads = []
