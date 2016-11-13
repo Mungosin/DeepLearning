@@ -288,7 +288,7 @@ class SoftmaxCrossEntropyWithLogits():
     probabilities = scores_exp / sum_exp[:, None]
     val = -np.log(probabilities) * y
     val = np.sum(val, axis=1)/len(y)
-    return val
+    return np.sum(val)
 
   def backward_inputs(self, x, y):
     """
@@ -326,8 +326,7 @@ class L2Regularizer():
      Returns:
       Scalar, loss due to the L2 regularization.
     """
-    # TODO
-    pass
+    return 1./2 * self.weight_decay * np.linalg.norm(self.weights.flatten())
 
   def backward_params(self):
     """
@@ -335,7 +334,7 @@ class L2Regularizer():
       Gradient of the L2 loss with respect to the regularized weights.
     """
     # TODO
-    grad_weights = 0
+    grad_weights = self.weight_decay*self.weights
     return [[self.weights, grad_weights], self.name]
 
 

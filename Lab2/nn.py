@@ -42,7 +42,7 @@ def draw_conv_filters(epoch, step, layer, save_dir):
   k = int(np.sqrt(w.shape[1] / C))
   w = w.reshape(num_filters, C, k, k)
   w -= w.min()
-  w /= w.max()
+  w /= 1.*w.max()
   border = 1
   cols = 8
   rows = math.ceil(num_filters / cols)
@@ -96,8 +96,8 @@ def train(train_x, train_y, valid_x, valid_y, net, loss, config):
         draw_conv_filters(epoch, i*batch_size, net[0], save_dir)
         #draw_conv_filters(epoch, i*batch_size, net[3])
       if i > 0 and i % 50 == 0:
-        print("Train accuracy = %.2f" % (cnt_correct / ((i+1)*batch_size) * 100))
-    print("Train accuracy = %.2f" % (cnt_correct / num_examples * 100))
+        print("Train accuracy = %.2f" % ((1.*cnt_correct) / ((i+1)*batch_size) * 100))
+    print("Train accuracy = %.2f" % ((1.*cnt_correct) / num_examples * 100))
     evaluate("Validation", valid_x, valid_y, net, loss, config)
   return net
 
@@ -120,8 +120,8 @@ def evaluate(name, x, y, net, loss, config):
     loss_val = loss.forward(logits, batch_y)
     loss_avg += loss_val
     #print("step %d / %d, loss = %.2f" % (i*batch_size, num_examples, loss_val / batch_size))
-  valid_acc = cnt_correct / num_examples * 100
-  loss_avg /= num_batches
+  valid_acc = (1.*cnt_correct) / num_examples * 100
+  loss_avg /= 1.*num_batches
   print(name + " accuracy = %.2f" % valid_acc)
   print(name + " avg loss = %.2f\n" % loss_avg)
 

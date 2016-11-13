@@ -8,14 +8,14 @@ import nn
 
 import layers
 
-DATA_DIR = '/home/kivan/datasets/MNIST/'
-SAVE_DIR = "/home/kivan/source/fer/out/"
+DATA_DIR = '../Lab1/MNIST_data'
+SAVE_DIR = './reg_save_dir'
 
 config = {}
 config['max_epochs'] = 8
 config['batch_size'] = 50
 config['save_dir'] = SAVE_DIR
-config['weight_decay'] = 1e-3
+config['weight_decay'] = 1e-2
 config['lr_policy'] = {1:{'lr':1e-1}, 3:{'lr':1e-2}, 5:{'lr':1e-3}, 7:{'lr':1e-4}}
 
 #np.random.seed(100) 
