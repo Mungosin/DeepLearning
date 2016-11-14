@@ -1,2 +1,2 @@
-model_checkpoint_path: "cifar.model.ckpt"
-all_model_checkpoint_paths: "cifar.model.ckpt"
+model_checkpoint_path: "cifar.model-hinge.ckpt"
+all_model_checkpoint_paths: "cifar.model-hinge.ckpt"
