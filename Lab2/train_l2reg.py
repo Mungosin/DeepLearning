@@ -9,7 +9,7 @@ import nn
 import layers
 
 DATA_DIR = '../Lab1/MNIST_data'
-SAVE_DIR = './reg_save_dir_1e-1'
+SAVE_DIR = './reg_save_dir_1e-2'
 
 config = {}
 config['max_epochs'] = 8
