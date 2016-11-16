@@ -9,13 +9,13 @@ import nn
 import layers
 
 DATA_DIR = '../Lab1/MNIST_data'
-SAVE_DIR = './reg_save_dir'
+SAVE_DIR = './reg_save_dir_1e-1'
 
 config = {}
 config['max_epochs'] = 8
 config['batch_size'] = 50
 config['save_dir'] = SAVE_DIR
-config['weight_decay'] = 1e-2
+config['weight_decay'] = 1e-1
 config['lr_policy'] = {1:{'lr':1e-1}, 3:{'lr':1e-2}, 5:{'lr':1e-3}, 7:{'lr':1e-4}}
 
 #np.random.seed(100) 
