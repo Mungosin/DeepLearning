@@ -264,7 +264,7 @@ class ReLU(Layer):
       ndarray of shape (N, C, H, W).
     """
     x = self.cache
-    dx = grads * (x >= 0)
+    dx = grads * (x > 0)
     return dx
 
 
